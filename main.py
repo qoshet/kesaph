@@ -35,12 +35,19 @@ def create_timestamp(commands):
 def parse_title_url(cmds):
     string = ' '.join(cmds)
     print string
-    quotes = string.split('#')
+    quotes = string.split('%')
     return (quotes[1].strip(), quotes[2].strip())
 
 def list_queue():
-    for q in scheduler.queue:
-        print q
+    if scheduler.queue == []:
+        print 'Nothing scheduled'
+    else:
+        for q in scheduler.queue:
+            print q
+
+def all_mode(c):
+    if c == 'list':
+        list_queue()
 
 def user_mode():
     while True:
@@ -51,10 +58,10 @@ def user_mode():
                 exit(1)
             elif c in ENABLE:
                 enable_mode()
-            elif c == 'list':
-                list_queue()
             elif c == 'time':
                 print time.strftime('%m-%d-%Y %H:%M:%S')
+            else:
+                all_mode(c)
 
 def enable_mode():
     while True:
@@ -87,5 +94,7 @@ def add_mode():
                 print 'Scheduler is running...'
                 scheduler.run()
                 print 'All scheduled events have been processed'
+            else:
+                all_mode(c)
 
 user_mode()
