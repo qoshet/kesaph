@@ -1,11 +1,9 @@
-import praw, time, sched, uuid, readline
-
-scheduler = sched.scheduler(time.time, time.sleep)
+import praw, time, uuid, readline, threading
 
 EXIT = ['exit', 'e']
 ENABLE = ['enable', 'en']
 QUEUE_LIMIT = 1600
-ADD_LENGTH = 9
+MIN_ADD = 9
 MIN_DELETE = 2
 
 events_queue = {};
@@ -31,19 +29,21 @@ def generate_event_key():
 
 def queue(future_time, subreddit, title, url):
     event_key = generate_event_key()
-    event_handler = scheduler.enterabs(future_time, 0, post, [event_key, subreddit, title, url])
+    countdown = create_countdown(future_time)
 
+    event_handler = threading.Timer(countdown, post, [event_key, subreddit, title, url])
     event_value = TimeEvent(event_handler, future_time, title, url, subreddit)
-    print '[' + str(event_key) + '] ' + str(event_value)
-
     events_queue[event_key] = event_value
+
+    event_handler.start()
+    print '[' + str(event_key) + '] ' + str(event_value)
 
 def cancel_event(event_key):
     if event_key not in events_queue:
         print 'Invalid ID supplied'
         return
     event = events_queue[event_key]
-    scheduler.cancel(event.event_handler)
+    event.event_handler.cancel()
 
 def delete_event(event_key, notify=True):
     if event_key not in events_queue:
@@ -64,6 +64,9 @@ def create_timestamp(commands):
     future_time = time.mktime(time_strp)
     return future_time
 
+def create_countdown(timestamp):
+    return timestamp - time.time()
+
 def parse_title_url(cmds):
     string = ' '.join(cmds)
     quotes = string.split('%')
@@ -79,10 +82,12 @@ def list_queue():
 def all_mode(c):
     if c == 'list':
         list_queue()
+    elif c == 'threads':
+        print threading.enumerate()
     elif c == 'time':
         print time.strftime('%m-%d-%Y %H:%M:%S')
     elif c == 'quit':
-        exit(1)
+        exit()
     else:
         print 'Unknown command'
 
@@ -93,7 +98,7 @@ def user_mode():
         if len(cmd) > 0:
             c = cmd[0]
             if c in EXIT:
-                exit(1)
+                exit()
             elif c in ENABLE:
                 enable_mode()
             else:
@@ -119,16 +124,16 @@ def add_mode():
             if c in EXIT:
                 return
             elif c == 'queue':
-                # month, day, year, hour, minute, title, url, subreddit
-                if len(cmd) != ADD_LENGTH:
-                    print 'Invalid number of arguments: month day year hour minute %title% url subreddit'
+                # month, day, year, hour, minute, subreddit, title, url
+                if len(cmd) < MIN_ADD:
+                    print 'Invalid number of arguments: month day year hour minute subreddit %title% url'
                     continue
                 if len(events_queue) >= QUEUE_LIMIT:
                     print 'Not enough space for additional queues'
                     continue
                 timestamp = cmd[1:6]
-                (title, url) = parse_title_url(cmd[6:8])
-                subreddit = cmd[8]
+                (title, url) = parse_title_url(cmd[7:])
+                subreddit = cmd[6]
                 queue(create_timestamp(timestamp), subreddit, title, url)
             elif c == 'delete':
                 if len(cmd) < MIN_DELETE:
@@ -137,11 +142,6 @@ def add_mode():
                 event_key = cmd[1]
                 cancel_event(event_key)
                 delete_event(event_key)
-            # TODO let scheduler run in background, instead of blocking
-            elif c == 'run':
-                print 'Scheduler is running...'
-                scheduler.run()
-                print 'All scheduled events have been processed'
             else:
                 all_mode(c)
 
