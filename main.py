@@ -24,7 +24,7 @@ def post(event_key, subreddit, title, url):
 def generate_event_key():
     key = str(uuid.uuid4())[:2]
     while key in events_queue:
-        key = str(uuid.uui4())[:2]
+        key = str(uuid.uuid4())[:2]
     return key
 
 def queue(future_time, subreddit, title, url):
